@@ -1,6 +1,6 @@
 #include "TCPListener.h"
 
-void TCPListener::StartListening(const u_short listeningPort)
+int TCPListener::StartListening(const u_short listeningPort)
 {
 	// stop prev listening
 	if (listeningThread)
@@ -12,8 +12,8 @@ void TCPListener::StartListening(const u_short listeningPort)
 
 	bIsTerminated = false;
 
-	CreateListenerSocket(listeningPort);
-	if (listenerSocket)
+	int result = CreateListenerSocket(listeningPort);
+	if (result == 0)
 	{
 		receiveDataMutex = new mutex();
 		listeningThread = new thread(&TCPListener::ListeningThreadProc, this);
@@ -21,6 +21,8 @@ void TCPListener::StartListening(const u_short listeningPort)
 		sendDataMutex = new mutex();
 		sendingThread = new thread(&TCPListener::SendThreadProc, this);
 	}
+
+	return result;
 }
 
 void TCPListener::StopListening()
@@ -61,7 +63,7 @@ void TCPListener::StopListening()
 	}
 }
 
-void TCPListener::CreateListenerSocket(u_short listeningPort)
+int TCPListener::CreateListenerSocket(u_short listeningPort)
 {
 	int result;
 
@@ -72,7 +74,7 @@ void TCPListener::CreateListenerSocket(u_short listeningPort)
 	result = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (result != 0)
 	{
-		throw new runtime_error("WSA Startup fail");
+		return WSAGetLastError();
 	}
 
 	// Address info
@@ -90,8 +92,9 @@ void TCPListener::CreateListenerSocket(u_short listeningPort)
 	string port = to_string(listeningPort);
 	result = getaddrinfo(NULL, port.c_str(), &addressInfo, &resolvedAddressInfo);
 	if (result != 0) {
+		int errorCode = WSAGetLastError();
 		WSACleanup();
-		throw new runtime_error("Error resolving address");
+		errorCode;
 	}
 
 	// Create listening socket
@@ -100,7 +103,7 @@ void TCPListener::CreateListenerSocket(u_short listeningPort)
 		int errorCode = WSAGetLastError();
 		freeaddrinfo(resolvedAddressInfo);
 		WSACleanup();
-		throw new runtime_error("Create listener socket fail");
+		return errorCode;
 	}
 	
 	// Setup the TCP listening socket
@@ -110,10 +113,11 @@ void TCPListener::CreateListenerSocket(u_short listeningPort)
 		freeaddrinfo(resolvedAddressInfo);
 		closesocket(listenerSocket);
 		WSACleanup();
-		throw new runtime_error("Listening socket bind error");
+		return errorCode;
 	}
 
 	freeaddrinfo(resolvedAddressInfo);
+	return 0;
 }
 
 void TCPListener::ListeningThreadProc()

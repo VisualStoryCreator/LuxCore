@@ -41,6 +41,8 @@ using namespace std;
 using namespace luxrays;
 using namespace luxcore;
 
+u_short listeningPort = 5736;
+
 bool isTerminated = false;
 RenderConfig* config = NULL;
 RenderSession* session = NULL;
@@ -125,7 +127,12 @@ void messageThreadProc()
 {
 	luxcore::Init();
 	
-	listener->StartListening(5736);
+	int result = listener->StartListening(listeningPort);
+	if (result != 0)
+	{
+		// error
+		exit(result);
+	}
 
 	vector<string> receivedData;
 	while (!isTerminated)
@@ -228,8 +235,44 @@ void messageThreadProc()
 	listener->StopListening();
 }
 
-int main(int argc, char *argv[]) {
-	try {
+int main(int argc, char *argv[])
+{
+	if (argc > 1)
+	{
+		if (string(argv[1]) == "-port")
+		{
+			if (argc > 2)
+			{
+				u_int port;
+				try 
+				{
+					port = atoi(argv[2]);
+					if (port > 0 && port < 65535)
+					{
+						listeningPort = port;
+					}
+					else
+					{
+						printf("Invalid port (must be in range (0..65535))\n");
+						exit(1);
+					}
+				}
+				catch(exception e)
+				{
+					printf("Invalid port\n");
+					exit(1);
+				}
+			}
+			else
+			{
+				printf("Port required\n");
+				exit(1);
+			}
+		}
+	}
+
+	try
+	{
 		listener = new TCPListener();
 		thread messageThread = thread(messageThreadProc);
 

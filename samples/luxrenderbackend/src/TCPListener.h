@@ -13,7 +13,7 @@ using namespace std;
 class TCPListener
 {
 public:
-	void StartListening(const u_short listeningPort);
+	int StartListening(const u_short listeningPort);
 
 	void StopListening();
 
@@ -46,7 +46,7 @@ private:
 	char* imageBuffer = NULL;
 	int imageBufferDataLength = 0;
 
-	void CreateListenerSocket(u_short listeningPort);
+	int CreateListenerSocket(u_short listeningPort);
 
 	void ListeningThreadProc();
 
