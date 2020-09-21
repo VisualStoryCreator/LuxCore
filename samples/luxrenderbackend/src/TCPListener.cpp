@@ -32,11 +32,13 @@ void TCPListener::StopListening()
 	if (clientSocket != 0)
 	{
 		closesocket(clientSocket);
+		clientSocket = NULL;
 	}
 
 	if (listenerSocket != 0)
 	{
 		closesocket(listenerSocket);
+		listenerSocket = NULL;
 	}
 
 	WSACleanup();
@@ -152,13 +154,14 @@ void TCPListener::ListeningThreadProc()
 				if (errorCode == WSAEINTR)
 				{
 					// iterrupted by user (may be exit command)
+					clientSocket = NULL;
 					break;
 				}
 				else
 				{
 					printf("Accept failed with error: %d\n", errorCode);
 					closesocket(listenerSocket);
-					clientSocket = 0;
+					clientSocket = NULL;
 					break;
 				}
 			}
@@ -193,13 +196,15 @@ void TCPListener::ListeningThreadProc()
 					if (errorCode == WSAEINTR)
 					{
 						// iterrupted by user (may be exit command)
+						closesocket(clientSocket);
+						clientSocket = NULL;
 						break;
 					}
 					else
 					{
 						printf("Connection aborted with error: %d\n", errorCode);
 						closesocket(listenerSocket);
-						clientSocket = 0;
+						clientSocket = NULL;
 						break;
 					}
 				}
@@ -351,6 +356,11 @@ void TCPListener::AddReceivedData(const string& Data)
 
 void TCPListener::Send(const string& Data)
 {
+	if (!clientSocket || clientSocket == INVALID_SOCKET)
+	{
+		return;
+	}
+
 	if (Data.empty())
 	{
 		return;

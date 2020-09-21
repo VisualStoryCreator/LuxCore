@@ -81,7 +81,10 @@ void Render()
 	}
 
 	// Stop the rendering
-	session->Stop();
+	if (session->IsStarted())
+	{
+		session->Stop();
+	}
 
 	printf("Render session complete\n");
 
@@ -97,21 +100,9 @@ void Render()
 
 void DeleteSession()
 {
-	if (config)
+	if (session && session->IsStarted())
 	{
-		delete config;
-		config = NULL;
-	}
-
-	if (session)
-	{
-		if (!session->HasDone())
-		{
-			session->Stop();
-		}
-
-		delete session;
-		session = NULL;
+		session->Stop();
 	}
 
 	if (rendererThread)
@@ -120,6 +111,18 @@ void DeleteSession()
 		delete rendererThread;
 
 		rendererThread = NULL;
+	}
+
+	if (session)
+	{
+		delete session;
+		session = NULL;
+	}
+
+	if (config)
+	{
+		delete config;
+		config = NULL;
 	}
 }
 

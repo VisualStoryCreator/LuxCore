@@ -35,8 +35,8 @@ private:
 	u_short listeningPort = 0;
 	
 	WSAData wsaData;
-	SOCKET listenerSocket = 0;
-	SOCKET clientSocket = 0;
+	SOCKET listenerSocket = NULL;
+	SOCKET clientSocket = NULL;
 
 	bool hasSendData = false;
 	vector<string> receivedData;
