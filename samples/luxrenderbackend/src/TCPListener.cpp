@@ -250,6 +250,10 @@ void TCPListener::SendThreadProc()
 						printf("Send failed with error: %d\n", WSAGetLastError());
 					}
 				}
+				else
+				{
+					printf("Rendered image data has been sent to client\n");
+				}
 
 				imageBufferDataLength = 0;
 			}

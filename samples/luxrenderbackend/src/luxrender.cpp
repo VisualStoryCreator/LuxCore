@@ -42,15 +42,16 @@ using namespace luxrays;
 using namespace luxcore;
 
 bool isTerminated = false;
+RenderConfig* config = NULL;
 RenderSession* session = NULL;
 TCPListener* listener = NULL;
+thread* rendererThread = NULL;
 
-void BatchRendering(RenderConfig *config, RenderState *startState, Film *startFilm)
+void Render()
 {
-	if (session)
-	{
-		delete session;
-	}
+	// resume saved session data (not supported yet)
+	RenderState* startState = NULL;
+	Film* startFilm = NULL;
 
 	session = RenderSession::Create(config, startState, startFilm);
 
@@ -80,6 +81,11 @@ void BatchRendering(RenderConfig *config, RenderState *startState, Film *startFi
 	// Stop the rendering
 	session->Stop();
 
+	printf("Render session complete\n");
+
+	// notify client
+	listener->Send("render-session-complete");
+
 	//const string renderEngine = config->GetProperty("renderengine.type").Get<string>();
 	//if (renderEngine != "FILESAVER") {
 	//	// Save the rendered image
@@ -87,7 +93,34 @@ void BatchRendering(RenderConfig *config, RenderState *startState, Film *startFi
 	//}
 }
 
-#pragma optimize("", off)
+void DeleteSession()
+{
+	if (config)
+	{
+		delete config;
+		config = NULL;
+	}
+
+	if (session)
+	{
+		if (!session->HasDone())
+		{
+			session->Stop();
+		}
+
+		delete session;
+		session = NULL;
+	}
+
+	if (rendererThread)
+	{
+		rendererThread->join();
+		delete rendererThread;
+
+		rendererThread = NULL;
+	}
+}
+
 void messageThreadProc()
 {
 	luxcore::Init();
@@ -131,34 +164,27 @@ void messageThreadProc()
 						continue;
 					}
 
-					if (!session)
+					// delete prev session or stop current session
+					DeleteSession();
+
+					// change working directory to .cfg location
+					auto path = boost::filesystem::path(args).parent_path();
+					boost::filesystem::current_path(path);
+
+					try
 					{
-						// change working directory to .cfg location
-						auto path = boost::filesystem::path(args).parent_path();
-						boost::filesystem::current_path(path);
-
-						RenderConfig* config = NULL;
-						try
-						{
-							config = RenderConfig::Create(Properties(args));
-						}
-						catch (exception& e)
-						{
-							printf(e.what());
-							printf("\n");
-						}
-						
-						if (config)
-						{
-							BatchRendering(config, NULL, NULL);
-							delete config;
-
-							printf("Render session complete\n");
-						}
+						config = RenderConfig::Create(Properties(args));
 					}
-					else
+					catch (exception& e)
 					{
-						printf("Cannot render. Another render session in progress");
+						printf(e.what());
+						printf("\n");
+					}
+						
+					if (config)
+					{
+						// start rendering session
+						rendererThread = new thread(Render);
 					}
 				}
 				else if (command == "get-rendered-image")
@@ -166,14 +192,28 @@ void messageThreadProc()
 					if (!session)
 					{
 						printf("There is no render session\n");
+						continue;
 					}
+					
+					// only OUTPUT_RGBA_IMAGEPIPELINE is supported
 
-					const unsigned int filmWidth = session->GetFilm().GetWidth();
-					const unsigned int filmHeight = session->GetFilm().GetHeight();
-					const unsigned int filmDataSize = filmWidth * filmHeight * 3 * sizeof(float);
-					const float* pixels = session->GetFilm().GetChannel<float>(Film::CHANNEL_IMAGEPIPELINE, 0);
+					u_int outputSize = session->GetFilm().GetOutputSize(Film::OUTPUT_RGBA_IMAGEPIPELINE) * 4;
+					float* buffer = (float*)malloc(outputSize);
+					session->GetFilm().GetOutput<float>(Film::OUTPUT_RGBA_IMAGEPIPELINE, buffer);
 
-					listener->Send((char*)pixels, 0, filmDataSize);
+					listener->Send((char*)buffer, 0, outputSize);
+
+					free(buffer);
+				}
+				else if (command == "exit")
+				{
+					// exit
+					isTerminated = true;
+					DeleteSession();
+					listener->StopListening();
+					delete listener;
+					exit(EXIT_SUCCESS);
+					return;
 				}
 				else
 				{
@@ -194,7 +234,7 @@ int main(int argc, char *argv[]) {
 		thread messageThread = thread(messageThreadProc);
 
 		char input[100];
-		while (true)
+		while (!isTerminated)
 		{
 			cin.getline(input, sizeof(input));
 
@@ -202,7 +242,6 @@ int main(int argc, char *argv[]) {
 			if (inputStr == "q" || inputStr == "quit" || inputStr == "e" || inputStr == "exit")
 			{
 				isTerminated = true;
-				messageThread.join();
 				break;
 			}
 			else
@@ -211,12 +250,9 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
+		messageThread.join();
 		delete listener;
-
-		if (session)
-		{
-			delete session;
-		}
+		DeleteSession();
 
 		LC_LOG("Done.");
 	} catch (runtime_error &err) {
@@ -229,5 +265,3 @@ int main(int argc, char *argv[]) {
 
 	return EXIT_SUCCESS;
 }
-
-#pragma optimize("", on)
