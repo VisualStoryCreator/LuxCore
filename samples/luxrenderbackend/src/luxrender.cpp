@@ -203,14 +203,16 @@ void messageThreadProc()
 					}
 					
 					// only OUTPUT_RGBA_IMAGEPIPELINE is supported
+					if (session->GetFilm().HasOutput(Film::OUTPUT_RGBA_IMAGEPIPELINE))
+					{
+						u_int outputSize = session->GetFilm().GetOutputSize(Film::OUTPUT_RGBA_IMAGEPIPELINE) * 4;
+						float* buffer = (float*)malloc(outputSize);
+						session->GetFilm().GetOutput<float>(Film::OUTPUT_RGBA_IMAGEPIPELINE, buffer);
 
-					u_int outputSize = session->GetFilm().GetOutputSize(Film::OUTPUT_RGBA_IMAGEPIPELINE) * 4;
-					float* buffer = (float*)malloc(outputSize);
-					session->GetFilm().GetOutput<float>(Film::OUTPUT_RGBA_IMAGEPIPELINE, buffer);
+						listener->Send((char*)buffer, 0, outputSize);
 
-					listener->Send((char*)buffer, 0, outputSize);
-
-					free(buffer);
+						free(buffer);
+					}
 				}
 				else if (command == "exit")
 				{
