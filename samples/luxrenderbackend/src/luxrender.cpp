@@ -1,21 +1,3 @@
-/***************************************************************************
- * Copyright 1998-2018 by authors (see AUTHORS.txt)                        *
- *                                                                         *
- *   This file is part of LuxCoreRender.                                   *
- *                                                                         *
- * Licensed under the Apache License, Version 2.0 (the "License");         *
- * you may not use this file except in compliance with the License.        *
- * You may obtain a copy of the License at                                 *
- *                                                                         *
- *     http://www.apache.org/licenses/LICENSE-2.0                          *
- *                                                                         *
- * Unless required by applicable law or agreed to in writing, software     *
- * distributed under the License is distributed on an "AS IS" BASIS,       *
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.*
- * See the License for the specific language governing permissions and     *
- * limitations under the License.                                          *
- ***************************************************************************/
-
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -35,6 +17,7 @@
 #include "luxrays/utils/oclerror.h"
 #include "luxcore/luxcore.h"
 
+#include "ConnectionService.h"
 #include "TCPListener.h"
 
 using namespace std;
@@ -46,7 +29,7 @@ u_short listeningPort = 5736;
 bool isTerminated = false;
 RenderConfig* config = NULL;
 RenderSession* session = NULL;
-TCPListener* listener = NULL;
+ConnectionService* listener = NULL;
 thread* rendererThread = NULL;
 
 void Render()
@@ -89,7 +72,10 @@ void Render()
 	printf("Render session complete\n");
 
 	// notify client
-	listener->Send("render-session-complete");
+	if (!isTerminated)
+	{
+		listener->Send("render-session-complete");
+	}
 
 	//const string renderEngine = config->GetProperty("renderengine.type").Get<string>();
 	//if (renderEngine != "FILESAVER") {
@@ -130,20 +116,20 @@ void messageThreadProc()
 {
 	luxcore::Init();
 	
-	int result = listener->StartListening(listeningPort);
+	int result = listener->StartListening(to_string(listeningPort));
 	if (result != 0)
 	{
 		// error
 		exit(result);
 	}
 
-	vector<string> receivedData;
+	vector<string> bufferInbox;
 	while (!isTerminated)
 	{
-		receivedData.clear();
-		if (listener->GetReceivedData(receivedData))
+		bufferInbox.clear();
+		if (listener->GetReceivedData(bufferInbox))
 		{
-			for (string line : receivedData)
+			for (string line : bufferInbox)
 			{
 				string command;
 				string args;

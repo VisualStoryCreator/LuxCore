@@ -1,58 +1,32 @@
 #pragma once
 
-#include <thread>
-#include <mutex>
 #include <winsock2.h>
 #include <iphlpapi.h>
 #include <ws2tcpip.h>
-#include <vector>
-#include <string>
+#include "ConnectionService.h"
 
 using namespace std;
 
-class TCPListener
+/* Service provides communication between this app and client via TCP protocol */
+class TCPListener : public ConnectionService
 {
 public:
-	int StartListening(const u_short listeningPort);
 
-	void StopListening();
+protected:
+	virtual void StateWaitForClientConnection() override;
 
-	bool GetReceivedData(vector<string>& OutReceivedData);
+	virtual void StateConnectedListening() override;
 
-	void AddReceivedData(const string& Data);
+	virtual void StateConnectedSending() override;
 
-	void Send(const string& Data);
+	virtual int InitializeConnection(const string& connectionId) override;
 
-	void Send(const char* buffer, int offset, int length);
+	virtual void CleanUp() override;
 
 private:
-	mutex* receiveDataMutex = NULL;
-	mutex* sendDataMutex = NULL;
-	thread* listeningThread = NULL;
-	thread* sendingThread = NULL;
-
-	bool bIsTerminated = true;
-	u_short listeningPort = 0;
-	
+	u_short listeningPort;
 	WSAData wsaData;
+
 	SOCKET listenerSocket = NULL;
 	SOCKET clientSocket = NULL;
-
-	bool hasSendData = false;
-	vector<string> receivedData;
-	vector<string> sendData;
-
-	const int IMAGE_BUFFER_SIZE = 1920 * 1080 * 4 * 4 * 2;
-	char* imageBuffer = NULL;
-	int imageBufferDataLength = 0;
-
-	int CreateListenerSocket(u_short listeningPort);
-
-	void ListeningThreadProc();
-
-	void SendThreadProc();
-
-	bool GetSendData(vector<string>& OutSendData);
-
-	inline void Sleep(int ms) { this_thread::sleep_for(chrono::milliseconds(ms)); }
 };
