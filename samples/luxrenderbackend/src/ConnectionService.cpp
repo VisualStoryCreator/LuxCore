@@ -18,6 +18,7 @@ int ConnectionService::StartListening(const string& connectionId)
 	{
 		ImageBuffer = (char*)malloc(IMAGE_BUFFER_SIZE);
 
+		MutexState = new mutex();
 		MutexOutbox = new mutex();
 		MutexInbox = new mutex();
 
@@ -119,15 +120,25 @@ void ConnectionService::CleanUp()
 		MutexInbox = NULL;
 	}
 
+	if (MutexState)
+	{
+		delete MutexState;
+		MutexState = NULL;
+	}
+
 	state = States::State_None;
 }
 
 void ConnectionService::SetState(States newState)
 {
-	if (state != States::State_Terminated)
+	MutexState->lock();
+	if (state != newState && state != States::State_Terminated)
 	{
+		States oldState = state;
 		state = newState;
+		OnStateChange(oldState, newState);
 	}
+	MutexState->unlock();
 }
 
 void ConnectionService::ClearReceivedData()

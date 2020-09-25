@@ -17,14 +17,20 @@
 #include "luxrays/utils/oclerror.h"
 #include "luxcore/luxcore.h"
 
-#include "ConnectionService.h"
+// available listeners
 #include "TCPListener.h"
+#include "PipeListener.h"
 
 using namespace std;
 using namespace luxrays;
 using namespace luxcore;
 
-u_short listeningPort = 5736;
+enum ListenerTypes { Listener_TCP, Listener_Pipe };
+
+ListenerTypes listenerType = ListenerTypes::Listener_Pipe;
+string portName = "5736"; // port for TCPListener
+string pipeName = "\\\\.\\pipe\\vsc-luxrender-pipe"; // pipe name for PipeListener
+string connectionId; // portName or pipeName depends on listenerType
 
 bool isTerminated = false;
 RenderConfig* config = NULL;
@@ -116,7 +122,7 @@ void messageThreadProc()
 {
 	luxcore::Init();
 	
-	int result = listener->StartListening(to_string(listeningPort));
+	int result = listener->StartListening(connectionId);
 	if (result != 0)
 	{
 		// error
@@ -230,17 +236,19 @@ int main(int argc, char *argv[])
 {
 	if (argc > 1)
 	{
+		// -port
 		if (string(argv[1]) == "-port")
 		{
 			if (argc > 2)
 			{
 				u_int port;
-				try 
+				try
 				{
 					port = atoi(argv[2]);
 					if (port > 0 && port < 65535)
 					{
-						listeningPort = port;
+						portName = to_string(port);
+						listenerType = ListenerTypes::Listener_TCP;
 					}
 					else
 					{
@@ -260,11 +268,33 @@ int main(int argc, char *argv[])
 				exit(1);
 			}
 		}
+
+		// -pipe
+		if (string(argv[1]) == "-pipe")
+		{
+			if (argc > 2)
+			{
+				pipeName = "\\\\.\\pipe\\" + string(argv[2]);
+				listenerType = ListenerTypes::Listener_Pipe;
+			}
+		}
 	}
 
 	try
 	{
-		listener = new TCPListener();
+		// select listener type
+		switch (listenerType)
+		{
+		case ListenerTypes::Listener_TCP:
+			listener = new TCPListener();
+			connectionId = portName;
+			break;
+		case ListenerTypes::Listener_Pipe:
+			listener = new PipeListener();
+			connectionId = pipeName;
+			break;
+		}
+
 		thread messageThread = thread(messageThreadProc);
 
 		char input[100];

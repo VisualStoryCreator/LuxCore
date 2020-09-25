@@ -51,6 +51,12 @@ public:
 	virtual void Send(const char* buffer, int offset, int length);
 
 protected:
+	/* Buffer size for rendered image */
+	const int IMAGE_BUFFER_SIZE = 1920 * 1080 * 4 * 4 * 2;
+
+	/* Mutex for state change (changing state must be thread-safe) */
+	mutex* MutexState = NULL;
+
 	/* Mutex for syncing receive data comes from client */
 	mutex* MutexInbox = NULL;
 
@@ -93,10 +99,9 @@ protected:
 	/* Clear all data buffer received from client (thread safe) */
 	void ClearReceivedData();
 
-private:
-	/* Buffer size for rendered image */
-	const int IMAGE_BUFFER_SIZE = 1920 * 1080 * 4 * 4 * 2;
+	virtual void OnStateChange(States oldState, States newState) { }
 
+private:
 	States state = States::State_None;	
 	
 	bool hasOutboxData = false;  // bufferOutbox.size() > 0 (for multithreading purposes)
