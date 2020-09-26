@@ -18,6 +18,7 @@
 #include "luxcore/luxcore.h"
 
 // available listeners
+#include "StandaloneListener.h"
 #include "TCPListener.h"
 #include "PipeListener.h"
 
@@ -25,9 +26,9 @@ using namespace std;
 using namespace luxrays;
 using namespace luxcore;
 
-enum ListenerTypes { Listener_TCP, Listener_Pipe };
+enum ListenerTypes { Standalone, Listener_TCP, Listener_Pipe };
 
-ListenerTypes listenerType = ListenerTypes::Listener_Pipe;
+ListenerTypes listenerType = ListenerTypes::Standalone;
 string portName = "5736"; // port for TCPListener
 string pipeName = "\\\\.\\pipe\\vsc-luxrender-pipe"; // pipe name for PipeListener
 string connectionId; // portName or pipeName depends on listenerType
@@ -83,11 +84,11 @@ void Render()
 		listener->Send("render-session-complete");
 	}
 
-	//const string renderEngine = config->GetProperty("renderengine.type").Get<string>();
-	//if (renderEngine != "FILESAVER") {
-	//	// Save the rendered image
-	//	session->GetFilm().SaveOutputs();
-	//}
+	const string renderEngine = config->GetProperty("renderengine.type").Get<string>();
+	if (renderEngine != "FILESAVER") {
+		// Save the rendered image
+		session->GetFilm().SaveOutputs();
+	}
 }
 
 void DeleteSession()
@@ -234,7 +235,14 @@ void messageThreadProc()
 
 int main(int argc, char *argv[])
 {
-	if (argc > 1)
+	if (argc == 2)
+	{
+		// standalone mode
+		// config to render (.cfg)
+		connectionId = argv[1];
+		listenerType = ListenerTypes::Standalone;
+	}
+	else if (argc > 2)
 	{
 		// -port
 		if (string(argv[1]) == "-port")
@@ -285,6 +293,9 @@ int main(int argc, char *argv[])
 		// select listener type
 		switch (listenerType)
 		{
+		case ListenerTypes::Standalone:
+			listener = new StandaloneListener();
+			break;
 		case ListenerTypes::Listener_TCP:
 			listener = new TCPListener();
 			connectionId = portName;

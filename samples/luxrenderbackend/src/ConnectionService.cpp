@@ -155,9 +155,16 @@ void ConnectionService::AddReceivedData(const string& data)
 		return;
 	}
 
-	MutexInbox->lock();
-	bufferInbox.push_back(data);
-	MutexInbox->unlock();
+	if (MutexInbox)
+	{
+		MutexInbox->lock();
+		bufferInbox.push_back(data);
+		MutexInbox->unlock();
+	}
+	else
+	{
+		bufferInbox.push_back(data);
+	}
 }
 
 void ConnectionService::Send(const string& data)
