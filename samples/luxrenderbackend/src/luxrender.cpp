@@ -76,18 +76,20 @@ void Render()
 		session->Stop();
 	}
 
+	// save file
+	const string renderEngine = config->GetProperty("renderengine.type").Get<string>();
+	if (renderEngine != "FILESAVER") {
+		// Save the rendered image
+		session->GetFilm().SaveOutputs();
+	}
+
 	printf("Render session complete\n");
 
 	// notify client
 	if (!isTerminated)
 	{
 		listener->Send("render-session-complete");
-	}
-
-	const string renderEngine = config->GetProperty("renderengine.type").Get<string>();
-	if (renderEngine != "FILESAVER") {
-		// Save the rendered image
-		session->GetFilm().SaveOutputs();
+		listener->NotifyRenderSessionComplete();
 	}
 }
 

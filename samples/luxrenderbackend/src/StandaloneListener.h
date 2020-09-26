@@ -4,6 +4,9 @@
 
 class StandaloneListener : public ConnectionService
 {
+public:
+	virtual void NotifyRenderSessionComplete() override;
+
 protected:
 	virtual void StateWaitForClientConnection() override;
 

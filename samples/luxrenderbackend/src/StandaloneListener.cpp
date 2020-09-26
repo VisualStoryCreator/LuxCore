@@ -1,5 +1,11 @@
 #include "StandaloneListener.h"
 
+void StandaloneListener::NotifyRenderSessionComplete()
+{
+	__super::NotifyRenderSessionComplete();
+	AddReceivedData("exit");
+}
+
 void StandaloneListener::StateWaitForClientConnection()
 {
 	printf("Standalone mode\n");

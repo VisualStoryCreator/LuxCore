@@ -50,6 +50,9 @@ public:
 	/* Send image data to client (thread safe) */
 	virtual void Send(const char* buffer, int offset, int length);
 
+	/* Do some actions when render session has done */
+	virtual void NotifyRenderSessionComplete() { }
+
 protected:
 	/* Buffer size for rendered image */
 	const int IMAGE_BUFFER_SIZE = 1920 * 1080 * 4 * 4 * 2;
