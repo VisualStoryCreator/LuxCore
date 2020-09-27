@@ -28,16 +28,27 @@ using namespace luxcore;
 
 enum ListenerTypes { Standalone, Listener_TCP, Listener_Pipe };
 
+double renderProgressSaveInterval = 10.0;
+
 ListenerTypes listenerType = ListenerTypes::Standalone;
 string portName = "5736"; // port for TCPListener
 string pipeName = "\\\\.\\pipe\\vsc-luxrender-pipe"; // pipe name for PipeListener
 string connectionId; // portName or pipeName depends on listenerType
+
+const string stopMarkerName = "___stop-marker.___";
 
 bool isTerminated = false;
 RenderConfig* config = NULL;
 RenderSession* session = NULL;
 ConnectionService* listener = NULL;
 thread* rendererThread = NULL;
+
+string to_string(int n, int countOfDigits)
+{
+	ostringstream ss;
+	ss << setw(countOfDigits) << setfill('0') << n;
+	return ss.str();
+}
 
 void Render()
 {
@@ -49,6 +60,11 @@ void Render()
 
 	const unsigned int haltTime = config->GetProperty("batch.halttime").Get<unsigned int>();
 	const unsigned int haltSpp = config->GetProperty("batch.haltspp").Get<unsigned int>();
+
+	bool isFileSaverRenderEngine = config->GetProperty("renderengine.type").Get<string>() == "FILESAVER";
+
+	double elapsedTime0 = 0.0;
+	int renderProgressCounter = -1;
 
 	// Start the rendering
 	session->Start();
@@ -68,6 +84,20 @@ void Render()
 			int(elapsedTime) % int(haltTime) % pass % haltSpp % (100.f * convergence) %
 			(stats.Get("stats.renderengine.total.samplesec").Get<double>() / 1000000.0) %
 			(stats.Get("stats.dataset.trianglecount").Get<double>() / 1000.0)));
+
+
+		// save render progress
+		if (renderProgressSaveInterval > 0.0 && elapsedTime - elapsedTime0 >= renderProgressSaveInterval)
+		{
+			elapsedTime0 = elapsedTime;
+			string fileName = "render-progress-" + to_string(++renderProgressCounter, 4) + ".png";
+
+			// only OUTPUT_RGBA_IMAGEPIPELINE is supported
+			if (session->GetFilm().HasOutput(Film::OUTPUT_RGBA_IMAGEPIPELINE))
+			{
+				session->GetFilm().SaveOutput(fileName, Film::OUTPUT_RGBA_IMAGEPIPELINE, config->GetProperties());
+			}
+		}
 	}
 
 	// Stop the rendering
@@ -76,10 +106,9 @@ void Render()
 		session->Stop();
 	}
 
-	// save file
-	const string renderEngine = config->GetProperty("renderengine.type").Get<string>();
-	if (renderEngine != "FILESAVER") {
-		// Save the rendered image
+	// Save the rendered image
+	if (!isFileSaverRenderEngine)
+	{
 		session->GetFilm().SaveOutputs();
 	}
 
@@ -92,7 +121,6 @@ void Render()
 		listener->NotifyRenderSessionComplete();
 	}
 }
-
 void DeleteSession()
 {
 	if (session && session->IsStarted())
@@ -176,6 +204,13 @@ void messageThreadProc()
 					auto path = boost::filesystem::path(args).parent_path();
 					boost::filesystem::current_path(path);
 
+					// look for special file that means 'stop'
+					// and delete it because it remains from prev session
+					if (boost::filesystem::exists(stopMarkerName))
+					{
+						remove(stopMarkerName.c_str());
+					}
+
 					try
 					{
 						config = RenderConfig::Create(Properties(args));
@@ -233,7 +268,7 @@ void messageThreadProc()
 		if (listenerType == ListenerTypes::Standalone)
 		{
 			// look for special file that means 'stop'
-			if (boost::filesystem::exists("___stop-marker.___"))
+			if (boost::filesystem::exists(stopMarkerName))
 			{
 				listener->AddReceivedData("exit");
 			}
@@ -306,6 +341,12 @@ int main(int argc, char *argv[])
 		switch (listenerType)
 		{
 		case ListenerTypes::Standalone:
+			if (connectionId.empty())
+			{
+				printf("Parameter missing: .cfg file name required");
+				exit(1);
+			}
+
 			listener = new StandaloneListener();
 			break;
 		case ListenerTypes::Listener_TCP:
