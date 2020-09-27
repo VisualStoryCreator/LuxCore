@@ -229,7 +229,17 @@ void messageThreadProc()
 			}
 		}
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		// handle user command 'stop'
+		if (listenerType == ListenerTypes::Standalone)
+		{
+			// look for special file that means 'stop'
+			if (boost::filesystem::exists("___stop-marker.___"))
+			{
+				listener->AddReceivedData("exit");
+			}
+		}
+
+		this_thread::sleep_for(chrono::milliseconds(listenerType == ListenerTypes::Standalone ? 1000 : 100));
 	}
 
 	listener->StopListening();
